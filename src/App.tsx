@@ -1,52 +1,40 @@
-import React, { Component, Props } from "react";
 
+import React, { Component } from "react";
+import Modal , {itemStates}  from "./components/Modal";
+import axios from "axios";
 
-const todoItems = [
-  {
-    id: 1,
-    title: "Go to Market",
-    description: "Buy ingredients to prepare dinner",
-    completed: true
-  },
-  {
-    id: 2,
-    title: "Study",
-    description: "Read Algebra and History textbook for upcoming test",
-    completed: false
-  },
-  {
-    id: 3,
-    title: "Sally's books",
-    description: "Go to library to rent sally's books",
-    completed: true
-  },
-  {
-    id: 4,
-    title: "Article",
-    description: "Write article on how to use django with react",
-    completed: false
-  }
-];
+type MyProps = any ; 
+type MyStates =  {
+  modal : boolean, 
+  viewCompleted : boolean , 
+  activeItem : itemStates   ,
+  todoList :  itemStates[], 
+}
 
-
-type MyProps = any;
-type MyState = {
-  // value: string,
-  viewCompleted: boolean,
-  todoList: {
-    filter : Function , 
-  },  
-};
-
-class App extends Component<MyProps, MyState>   {
+class App extends Component<MyProps, MyStates>  {
   constructor(props: any) {
     super(props);
     this.state = {
+      modal : false , 
       viewCompleted: false,
-      todoList: todoItems
+      activeItem: { 
+        title: "",
+        description: "",
+        completed: false
+      },
+      todoList: []
     };
   }
-  displayCompleted = (status: any) => {
+  componentDidMount() {
+    this.refreshList();
+  }
+  refreshList = () => {
+    axios
+      .get("http://localhost:8000/api/testings/")
+      .then(res => this.setState({ todoList: res.data }))
+      .catch(err => console.log(err));
+  };
+  displayCompleted = (status : boolean ) => {
     if (status) {
       return this.setState({ viewCompleted: true });
     }
@@ -73,9 +61,9 @@ class App extends Component<MyProps, MyState>   {
   renderItems = () => {
     const { viewCompleted } = this.state;
     const newItems = this.state.todoList.filter(
-      (item: { completed: any; }) => item.completed == viewCompleted
+      item => item.completed === viewCompleted
     );
-    return newItems.map((item: { id: string | number | null | undefined; description: string | undefined; title: React.ReactNode; }) => (
+    return newItems.map(item => (
       <li
         key={item.id}
         className="list-group-item d-flex justify-content-between align-items-center"
@@ -88,11 +76,58 @@ class App extends Component<MyProps, MyState>   {
           {item.title}
         </span>
         <span>
-          <button className="btn btn-secondary mr-2"> Edit </button>
-          <button className="btn btn-danger">Delete </button>
+          <button
+            onClick={() => this.editItem(item)}
+            className="btn btn-secondary mr-2"
+          >
+            {" "}
+                Edit{" "}
+          </button>
+          <button
+            onClick={() => this.handleDelete(item)}
+            className="btn btn-danger"
+          >
+            Delete{" "}
+          </button>
         </span>
       </li>
     ));
+  };
+  toggle = () => {
+    this.setState({ modal :!this.state.modal});
+  };
+
+  handleSubmit = (item : itemStates) => {
+    this.toggle();
+    console.log(item) ; 
+    if (item.id) {
+      axios
+        .put(`http://localhost:8000/api/testings/${item.id}/`, item)
+        .then(res => this.refreshList());
+        console.log('submitted old') ; 
+      return;
+    }
+    console.log('submitted new ') ; 
+    axios
+      .post("http://localhost:8000/api/testings/", item)
+      .then(res => this.refreshList());
+  };
+
+  handleDelete = (item : itemStates) => {
+    axios
+      .delete(`http://localhost:8000/api/testings/${item.id}`)
+      .then(res => this.refreshList());
+  };
+  createItem = () => {
+    console.log(this.state.todoList.length) ; 
+    
+    console.log(this.state.activeItem.id) ; 
+    const item = {  title: "", description: "", completed: false };
+    
+    this.setState({ activeItem: item, modal: !this.state.modal });
+  };
+  editItem = (item : itemStates) => {
+    this.setState({ activeItem: item, modal: !this.state.modal});
   };
   render() {
     return (
@@ -102,7 +137,9 @@ class App extends Component<MyProps, MyState>   {
           <div className="col-md-6 col-sm-10 mx-auto p-0">
             <div className="card p-3">
               <div className="">
-                <button className="btn btn-primary">Add task</button>
+                <button onClick={this.createItem} className="btn btn-primary">
+                  Add task
+                    </button>
               </div>
               {this.renderTabList()}
               <ul className="list-group list-group-flush">
@@ -111,6 +148,13 @@ class App extends Component<MyProps, MyState>   {
             </div>
           </div>
         </div>
+        {this.state.modal ? (
+          <Modal
+            activeItem={this.state.activeItem}
+            toggle={this.toggle}
+            onSave={this.handleSubmit}
+          />
+        ) : null}
       </main>
     );
   }
